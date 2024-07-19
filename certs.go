@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"embed"
+	"sync"
 )
 
 type Certs map[string]*tls.Certificate
@@ -29,13 +30,14 @@ func (c Certs) Add(cert *tls.Certificate) error {
 var defaultCertFiles embed.FS
 
 var defaultCert *tls.Certificate
+var defaultCertSyncOnce sync.Once
 
 func GetDefaultCert() *tls.Certificate {
-	if defaultCert == nil {
+	defaultCertSyncOnce.Do(func() {
 		crt, _ := defaultCertFiles.ReadFile("default.crt")
 		key, _ := defaultCertFiles.ReadFile("default.key")
 		cert, _ := tls.X509KeyPair(crt, key)
 		defaultCert = &cert
-	}
+	})
 	return defaultCert
 }

@@ -2,20 +2,17 @@ package nametocert
 
 import (
 	"crypto/tls"
-	"errors"
 	"strings"
 )
 
-var ErrUnrecognizedName = errors.New("nametocert: unrecognized name")
-
 type Processor struct {
+	certs Certs
+
 	// If the name cannot be recognized, reject handshake
 	RejectHandshakeIfUnrecognizedName bool
 
 	// If nil, use the built-in certificate
 	DefaultCert *tls.Certificate
-
-	certs Certs
 }
 
 func NewProcessor(certs Certs) *Processor {
@@ -24,7 +21,7 @@ func NewProcessor(certs Certs) *Processor {
 	}
 }
 
-func (c *Processor) Set(certs Certs) {
+func (c *Processor) SetCerts(certs Certs) {
 	c.certs = certs
 }
 
@@ -43,20 +40,7 @@ func (c *Processor) GetCertificate(info *tls.ClientHelloInfo) (*tls.Certificate,
 	}
 	// Reject Handshake
 	if c.RejectHandshakeIfUnrecognizedName {
-		info.Conn.Write([]byte{
-			// Content Type: Alert
-			21,
-			// Version: TLS 1.2
-			3, 3,
-			// Length: 2
-			0, 2,
-			// Alert Message Level: Fatal
-			2,
-			// Alert Message Description: Unrecognized Name
-			112,
-		})
-		info.Conn.Close()
-		return nil, ErrUnrecognizedName
+		return nil, nil
 	}
 	// Default
 	if c.DefaultCert != nil {

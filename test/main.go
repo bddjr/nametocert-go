@@ -23,7 +23,7 @@ func updateCert() error {
 	certs.Add(&cert)
 
 	// Hot Update Certificate
-	certsProc.Set(certs)
+	certsProc.SetCerts(certs)
 
 	return nil
 }
@@ -44,7 +44,7 @@ func main() {
 	srv := &http.Server{
 		Addr: ":5678",
 		TLSConfig: &tls.Config{
-			// Use it
+			Certificates:   nil,
 			GetCertificate: certsProc.GetCertificate,
 		},
 	}
