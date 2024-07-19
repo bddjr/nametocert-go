@@ -59,9 +59,9 @@ func (c *Certs) GetCert_DefaultReject(info *tls.ClientHelloInfo) (*tls.Certifica
 
 // If the name cannot be recognized, return the default certificate.
 func (c *Certs) GetCert_DefaultCert(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	cert, err := c.GetCert_DefaultReject(info)
-	if cert != nil || err != nil {
-		return cert, err
+	cert, _ := c.GetCert_DefaultReject(info)
+	if cert != nil {
+		return cert, nil
 	}
 	// Default
 	if c.DefaultCert != nil {
