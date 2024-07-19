@@ -1,7 +1,7 @@
 # NameToCert-go
 
 ## Feature
-- Hot Update Certificate
+- Hot Update Certificates
 - SSL Reject Handshake
 
 ## Get

@@ -10,7 +10,7 @@ type Processor struct {
 
 	// If the name cannot be recognized, reject the handshake.
 	// This option does not support hot updates.
-	// If you change this option, please restart the server.
+	// If you change this option, please restart the HTTPS server.
 	RejectHandshakeIfUnrecognizedName bool
 
 	// If nil, use the built-in certificate
@@ -23,6 +23,7 @@ func NewProcessor(certs Certs) *Processor {
 	}
 }
 
+// Hot Update Certificates
 func (c *Processor) SetCerts(certs Certs) {
 	c.certs = certs
 }

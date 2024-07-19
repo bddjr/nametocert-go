@@ -8,12 +8,7 @@ import (
 	"github.com/bddjr/nametocert-go"
 )
 
-var certsProc = &nametocert.Processor{
-	// If the name cannot be recognized, reject the handshake.
-	// This option does not support hot updates.
-	// If you change this option, please restart the server.
-	RejectHandshakeIfUnrecognizedName: true,
-}
+var certsProc nametocert.Processor
 
 func updateCert() error {
 	certs := nametocert.Certs{}
@@ -24,7 +19,7 @@ func updateCert() error {
 	}
 	certs.Add(&cert)
 
-	// Hot Update Certificate
+	// Hot Update Certificates
 	certsProc.SetCerts(certs)
 
 	return nil
@@ -42,6 +37,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	// If the name cannot be recognized, reject the handshake.
+	// This option does not support hot updates.
+	// If you change this option, please restart the HTTPS server.
+	certsProc.RejectHandshakeIfUnrecognizedName = true
 
 	srv := &http.Server{
 		Addr: ":5678",
