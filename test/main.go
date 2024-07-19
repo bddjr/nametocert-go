@@ -11,6 +11,7 @@ import (
 var certsProc = &nametocert.Processor{
 	// If the name cannot be recognized, reject the handshake.
 	// This option does not support hot updates.
+	// If you change this option, please restart the server.
 	RejectHandshakeIfUnrecognizedName: true,
 }
 
