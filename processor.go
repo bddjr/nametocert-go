@@ -2,48 +2,66 @@ package nametocert
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"strings"
 )
 
-type Processor struct {
-	certs Certs
+type certsMap map[string]*tls.Certificate
 
-	// If the name cannot be recognized, reject the handshake.
-	// This option does not support hot updates.
-	// If you change this option, please restart the HTTPS server.
-	RejectHandshakeIfUnrecognizedName bool
+type Certs struct {
+	lockedCerts certsMap
+	certs       certsMap
 
 	// If nil, use the built-in certificate
 	DefaultCert *tls.Certificate
 }
 
-func NewProcessor(certs Certs) *Processor {
-	return &Processor{
-		certs: certs,
+func (c *Certs) Clear() {
+	c.certs = certsMap{}
+}
+
+func (c *Certs) Add(cert *tls.Certificate) error {
+	xc, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return err
 	}
+	// domain name
+	for _, name := range xc.DNSNames {
+		c.certs[name] = cert
+	}
+	// IP (no SNI)
+	if len(xc.IPAddresses) > 0 {
+		c.certs[""] = cert
+	}
+	return nil
 }
 
-// Hot Update Certificates
-func (c *Processor) SetCerts(certs Certs) {
-	c.certs = certs
+func (c *Certs) CompleteUpdate() {
+	c.lockedCerts = c.certs
+	c.Clear()
 }
 
-func (c *Processor) GetCertificate(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	if c.certs != nil {
-		// www.example.com
-		if cert, ok := c.certs[info.ServerName]; ok {
+// If the name cannot be recognized, reject the handshake.
+func (c *Certs) GetCert_DefaultReject(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	// www.example.com
+	if cert, ok := c.lockedCerts[info.ServerName]; ok {
+		return cert, nil
+	}
+	// *.example.com
+	if i := strings.IndexByte(info.ServerName, '.'); i != -1 {
+		if cert, ok := c.lockedCerts["*"+info.ServerName[i:]]; ok {
 			return cert, nil
-		}
-		// *.example.com
-		if i := strings.IndexByte(info.ServerName, '.'); i != -1 {
-			if cert, ok := c.certs["*"+info.ServerName[i:]]; ok {
-				return cert, nil
-			}
 		}
 	}
 	// Reject Handshake
-	if c.RejectHandshakeIfUnrecognizedName {
-		return nil, nil
+	return nil, nil
+}
+
+// If the name cannot be recognized, return the default certificate.
+func (c *Certs) GetCert_DefaultCert(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	cert, err := c.GetCert_DefaultReject(info)
+	if cert != nil || err != nil {
+		return cert, err
 	}
 	// Default
 	if c.DefaultCert != nil {
