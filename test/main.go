@@ -8,6 +8,26 @@ import (
 	"github.com/bddjr/nametocert-go"
 )
 
+var certsProc = &nametocert.Processor{
+	// SSL Reject Handshake
+	RejectHandshakeIfUnrecognizedName: true,
+}
+
+func updateCert() error {
+	certs := nametocert.Certs{}
+
+	cert, err := tls.LoadX509KeyPair("localhost.crt", "localhost.key")
+	if err != nil {
+		return err
+	}
+	certs.Add(&cert)
+
+	// Hot Update Certificate
+	certsProc.Set(certs)
+
+	return nil
+}
+
 func main() {
 	fmt.Print("\n" +
 		"  Accept: https://www.localhost:5678\n" +
@@ -16,25 +36,16 @@ func main() {
 		"\n",
 	)
 
-	certs := make([]*tls.Certificate, 1)
-	cert, err := tls.LoadX509KeyPair("localhost.crt", "localhost.key")
+	err := updateCert()
 	if err != nil {
 		panic(err)
 	}
-	certs[0] = &cert
-
-	nameToCertConf := nametocert.New(certs)
-
-	// SSL Reject Handshake
-	nameToCertConf.RejectHandshakeIfUnrecognizedName = true
-
-	// Hot Update Certificate
-	// nameToCertConf.Reset(certs)
 
 	srv := &http.Server{
 		Addr: ":5678",
 		TLSConfig: &tls.Config{
-			GetCertificate: nameToCertConf.GetCertificate,
+			// Use it
+			GetCertificate: certsProc.GetCertificate,
 		},
 	}
 	err = srv.ListenAndServeTLS("", "")

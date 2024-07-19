@@ -2,52 +2,41 @@ package nametocert
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"strings"
 )
 
-type Conf struct {
-	NameToCert map[string]*tls.Certificate
+var ErrUnrecognizedName = errors.New("nametocert: unrecognized name")
 
+type Processor struct {
 	// If the name cannot be recognized, reject handshake
 	RejectHandshakeIfUnrecognizedName bool
+
+	// If nil, use the built-in certificate
+	DefaultCert *tls.Certificate
+
+	certs Certs
 }
 
-func New(Certs []*tls.Certificate) *Conf {
-	c := &Conf{}
-	c.Reset(Certs)
-	return c
-}
-
-func (c *Conf) Reset(Certs []*tls.Certificate) {
-	ntc := map[string]*tls.Certificate{}
-	for _, cert := range Certs {
-		xc, err := x509.ParseCertificate(cert.Certificate[0])
-		if err != nil {
-			panic(err)
-		}
-		// domain name
-		for _, name := range xc.DNSNames {
-			ntc[name] = cert
-		}
-		// ip (no SNI)
-		if len(xc.IPAddresses) > 0 {
-			ntc[""] = cert
-		}
+func NewProcessor(certs Certs) *Processor {
+	return &Processor{
+		certs: certs,
 	}
-	c.NameToCert = ntc
 }
 
-func (c *Conf) GetCertificate(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	if c.NameToCert != nil {
+func (c *Processor) Set(certs Certs) {
+	c.certs = certs
+}
+
+func (c *Processor) GetCertificate(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	if c.certs != nil {
 		// www.example.com
-		if cert, ok := c.NameToCert[info.ServerName]; ok {
+		if cert, ok := c.certs[info.ServerName]; ok {
 			return cert, nil
 		}
 		// *.example.com
 		if i := strings.IndexByte(info.ServerName, '.'); i != -1 {
-			if cert, ok := c.NameToCert["*"+info.ServerName[i:]]; ok {
+			if cert, ok := c.certs["*"+info.ServerName[i:]]; ok {
 				return cert, nil
 			}
 		}
@@ -67,8 +56,11 @@ func (c *Conf) GetCertificate(info *tls.ClientHelloInfo) (*tls.Certificate, erro
 			112,
 		})
 		info.Conn.Close()
-		return nil, errors.New("nametocert: unrecognized name")
+		return nil, ErrUnrecognizedName
 	}
 	// Default
-	return getDefaultCert(), nil
+	if c.DefaultCert != nil {
+		return c.DefaultCert, nil
+	}
+	return GetDefaultCert(), nil
 }
