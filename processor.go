@@ -8,7 +8,8 @@ import (
 type Processor struct {
 	certs Certs
 
-	// If the name cannot be recognized, reject handshake
+	// If the name cannot be recognized, reject the handshake.
+	// This option does not support hot updates.
 	RejectHandshakeIfUnrecognizedName bool
 
 	// If nil, use the built-in certificate

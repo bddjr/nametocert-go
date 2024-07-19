@@ -9,7 +9,8 @@ import (
 )
 
 var certsProc = &nametocert.Processor{
-	// SSL Reject Handshake
+	// If the name cannot be recognized, reject the handshake.
+	// This option does not support hot updates.
 	RejectHandshakeIfUnrecognizedName: true,
 }
 
