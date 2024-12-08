@@ -2,70 +2,56 @@ package nametocert
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"strings"
 )
 
 type certsMap map[string]*tls.Certificate
 
 type Certs struct {
-	lockedCerts certsMap
-	certs       certsMap
-
-	// If nil, use the built-in certificate
-	DefaultCert *tls.Certificate
+	m certsMap
 }
 
-func (c *Certs) Clear() {
-	c.certs = certsMap{}
-}
-
-func (c *Certs) Add(cert *tls.Certificate) error {
-	xc, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return err
+func (c *Certs) Reset(f func(ctx *Context) error) error {
+	ctx := &Context{
+		m: make(certsMap),
 	}
-	// domain name
-	for _, name := range xc.DNSNames {
-		c.certs[name] = cert
+	err := f(ctx)
+	if err == nil {
+		c.m = ctx.m
 	}
-	// IP (no SNI)
-	if len(xc.IPAddresses) > 0 {
-		c.certs[""] = cert
-	}
-	return nil
+	return err
 }
 
-func (c *Certs) CompleteUpdate() {
-	c.lockedCerts = c.certs
-	c.Clear()
-}
-
-// If the name cannot be recognized, reject the handshake.
-func (c *Certs) GetCert_DefaultReject(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (c *Certs) get(name string) *tls.Certificate {
+	if c.m == nil {
+		return nil
+	}
+	name = strings.ToLower(name)
 	// www.example.com
-	if cert, ok := c.lockedCerts[info.ServerName]; ok {
-		return cert, nil
+	if cert, ok := c.m[name]; ok {
+		return cert
 	}
 	// *.example.com
-	if i := strings.IndexByte(info.ServerName, '.'); i != -1 {
-		if cert, ok := c.lockedCerts["*"+info.ServerName[i:]]; ok {
-			return cert, nil
+	if i := strings.IndexByte(name, '.'); i != -1 {
+		if cert, ok := c.m["*"+name[i:]]; ok {
+			return cert
 		}
 	}
-	// Reject Handshake
-	return nil, nil
+	// Default or Reject Handshake
+	cert, ok := c.m["*"]
+	_ = ok
+	return cert
 }
 
-// If the name cannot be recognized, return the default certificate.
-func (c *Certs) GetCert_DefaultCert(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	cert, _ := c.GetCert_DefaultReject(info)
-	if cert != nil {
-		return cert, nil
+func (c *Certs) GetCertificate(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return c.get(info.ServerName), nil
+}
+
+func (c *Certs) TLSConfig(config *tls.Config) *tls.Config {
+	if config == nil {
+		config = &tls.Config{}
 	}
-	// Default
-	if c.DefaultCert != nil {
-		return c.DefaultCert, nil
-	}
-	return GetDefaultCert(), nil
+	config.Certificates = nil
+	config.GetCertificate = c.GetCertificate
+	return config
 }

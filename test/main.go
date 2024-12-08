@@ -10,25 +10,14 @@ import (
 
 var certs nametocert.Certs
 
-// This option does not support hot update,
-// please restart the HTTPS server after changing it.
-var enableRejectHandshakeIfUnrecognizedName = true
-
 func updateCert() error {
-	// Clear
-	certs.Clear()
-
-	// Add
-	cert, err := tls.LoadX509KeyPair("localhost.crt", "localhost.key")
-	if err != nil {
+	return certs.Reset(func(ctx *nametocert.Context) error {
+		cert, err := tls.LoadX509KeyPair("localhost.crt", "localhost.key")
+		if err == nil {
+			err = ctx.Add(&cert)
+		}
 		return err
-	}
-	certs.Add(&cert)
-
-	// Hot Update Certificates
-	certs.CompleteUpdate()
-
-	return nil
+	})
 }
 
 func main() {
@@ -47,16 +36,9 @@ func main() {
 	srv := &http.Server{
 		Addr: ":5678",
 		TLSConfig: &tls.Config{
-			Certificates: nil,
+			Certificates:   nil,
+			GetCertificate: certs.GetCertificate,
 		},
-	}
-
-	// This option does not support hot update,
-	// please restart the HTTPS server after changing it.
-	if enableRejectHandshakeIfUnrecognizedName {
-		srv.TLSConfig.GetCertificate = certs.GetCert_DefaultReject
-	} else {
-		srv.TLSConfig.GetCertificate = certs.GetCert_DefaultCert
 	}
 
 	err = srv.ListenAndServeTLS("", "")
